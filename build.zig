@@ -15,13 +15,13 @@ pub fn build(b: *std.Build) void {
         .link_libc = true,
     });
 
-    // const softsrv_module = b.addModule("softsrv", .{
-    //     .root_source_file = "lib/softsrv/src/main.zig",
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
+    const softsrv_module = b.addModule("softsrv", .{
+        .root_source_file = .{ .path = "lib/softsrv/src/softsrv.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
 
-    // exe.root_module.addImport("softsrv", softsrv_module);
+    exe.root_module.addImport("softsrv", softsrv_module);
 
     b.installArtifact(exe);
 

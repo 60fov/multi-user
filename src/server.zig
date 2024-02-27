@@ -9,7 +9,8 @@ pub const tick_rate = 120;
 pub const conn_max = 256;
 
 // TODO why do these have to be var
-pub var ip: std.net.Address = std.net.Address.initIp4([4]u8{ 192, 168, 1, 9 }, 0xbeef);
+
+pub var ip: std.net.Address = std.net.Address.initIp4([4]u8{ 172, 16, 4, 7 }, 0xbeef);
 
 const Server = @This();
 
