@@ -1,0 +1,3 @@
+[submodule "lib/softsrv"]
+	path = lib/softsrv
+	url = https://github.com/60fov/softsrv.git
