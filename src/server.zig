@@ -1,6 +1,7 @@
 const std = @import("std");
 
-const softsrv = @import("softsrv");
+// const softsrv = @import("softsrv");
+const chrono = @import("chrono.zig");
 const net = @import("net.zig");
 
 const game = @import("game.zig");
@@ -134,7 +135,7 @@ pub fn isAddressConnected(self: *Server, address: std.net.Address) bool {
 }
 
 pub fn run(self: *Server) void {
-    var tick_limiter = softsrv.chrono.RateLimiter.init(tick_rate);
+    var tick_limiter = chrono.RateLimiter.init(tick_rate);
     // var frame_limiter = softsrv.chrono.RateLimiter.init(Server.RATE);
 
     var running = true;

@@ -37,7 +37,7 @@ pub fn socket(self: *Socket, options: Options) !void {
         os.SOCK.DGRAM | os.SOCK.NONBLOCK,
         0,
     );
-    errdefer os.closeSocket(sockfd);
+    errdefer os.close(sockfd);
 
     if (options.reuse_address) {
         try os.setsockopt(
@@ -156,7 +156,7 @@ pub fn getName(self: *Socket) !std.net.Address {
 
 pub fn close(self: *Socket) void {
     if (self.fd) |fd| {
-        os.closeSocket(fd);
+        os.close(fd);
         self.fd = null;
         self.address = null;
     }

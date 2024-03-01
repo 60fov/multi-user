@@ -1,11 +1,11 @@
 const std = @import("std");
 const Game = @This();
-const softsrv = @import("softsrv");
-const Framebuffer = softsrv.Framebuffer;
-const BitmapFont = softsrv.BitmapFont;
+// const softsrv = @import("softsrv");
+// const Framebuffer = softsrv.Framebuffer;
+// const BitmapFont = softsrv.BitmapFont;
 
-const kb = softsrv.input.kb;
-const mouse = softsrv.input.mouse;
+// const kb = softsrv.input.kb;
+// const mouse = softsrv.input.mouse;
 
 pub const Vec2 = struct {
     x: f32 = 0,
@@ -42,29 +42,29 @@ pub fn simulate(state: *Game.State, ms: i64) void {
     state.time += delta;
 
     {
-        var dx: f32 = 0;
-        var dy: f32 = 0;
+        // var dx: f32 = 0;
+        // var dy: f32 = 0;
 
-        if (kb().key(.KC_S).isDown()) {
-            dx += -1;
-        }
-        if (kb().key(.KC_C).isDown()) {
-            dy += 1;
-        }
-        if (kb().key(.KC_F).isDown()) {
-            dx += 1;
-        }
-        if (kb().key(.KC_E).isDown()) {
-            dy += -1;
-        }
+        // if (kb().key(.KC_S).isDown()) {
+        //     dx += -1;
+        // }
+        // if (kb().key(.KC_C).isDown()) {
+        //     dy += 1;
+        // }
+        // if (kb().key(.KC_F).isDown()) {
+        //     dx += 1;
+        // }
+        // if (kb().key(.KC_E).isDown()) {
+        //     dy += -1;
+        // }
 
-        state.player.vel.x = dx * state.player.speed;
-        state.player.vel.y = dy * state.player.speed;
+        // state.player.vel.x = dx * state.player.speed;
+        // state.player.vel.y = dy * state.player.speed;
 
-        state.player.pos.x += state.player.vel.x * delta;
-        state.player.pos.y += state.player.vel.y * delta;
-        if (state.player.pos.x < 0) state.player.pos.x = 0;
-        if (state.player.pos.y < 0) state.player.pos.y = 0;
+        // state.player.pos.x += state.player.vel.x * delta;
+        // state.player.pos.y += state.player.vel.y * delta;
+        // if (state.player.pos.x < 0) state.player.pos.x = 0;
+        // if (state.player.pos.y < 0) state.player.pos.y = 0;
     }
 
     for (&state.entities, 0..) |*e, i| {
@@ -80,19 +80,20 @@ pub fn simulate(state: *Game.State, ms: i64) void {
     }
 }
 
-pub fn render(state: *const Game.State, fb: *Framebuffer) void {
-    fb.clear();
+pub fn render(state: *const Game.State) void {
+    _ = state;
+    // fb.clear();
 
-    const p = state.player;
-    softsrv.draw.rect(fb, @intFromFloat(p.pos.x), @intFromFloat(p.pos.y), 50, 50, 100, 100, 255);
+    // const p = state.player;
+    // softsrv.draw.rect(fb, @intFromFloat(p.pos.x), @intFromFloat(p.pos.y), 50, 50, 100, 100, 255);
 
-    const font = try softsrv.getDefaultFont();
-    const buffer = try softsrv.getDebugBuffer();
-    for (state.entities, 0..) |e, i| {
-        softsrv.draw.rect(fb, @intFromFloat(e.pos.x), @intFromFloat(e.pos.y), 50, 50, 255, 100, 100);
-        const str = std.fmt.bufPrint(buffer, "e[{d}] x {d:.1} y {d:.1} vx {d:.1} vy {d:.1}", .{ i, e.pos.x, e.pos.y, e.vel.x, e.vel.y }) catch continue;
-        softsrv.draw.text(fb, str, font, 10, 10 + @as(i32, @intCast(i * 10)));
-    }
+    // const font = try softsrv.getDefaultFont();
+    // const buffer = try softsrv.getDebugBuffer();
+    // for (state.entities, 0..) |e, i| {
+    //     softsrv.draw.rect(fb, @intFromFloat(e.pos.x), @intFromFloat(e.pos.y), 50, 50, 255, 100, 100);
+    //     const str = std.fmt.bufPrint(buffer, "e[{d}] x {d:.1} y {d:.1} vx {d:.1} vy {d:.1}", .{ i, e.pos.x, e.pos.y, e.vel.x, e.vel.y }) catch continue;
+    //     softsrv.draw.text(fb, str, font, 10, 10 + @as(i32, @intCast(i * 10)));
+    // }
 
-    softsrv.platform.present(fb);
+    // softsrv.platform.present(fb);
 }

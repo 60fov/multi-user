@@ -1,3 +1,6 @@
 [submodule "lib/softsrv"]
 	path = lib/softsrv
 	url = https://github.com/60fov/softsrv.git
+[submodule "lib/zigglgen"]
+	path = lib/zigglgen
+	url = https://github.com/60fov/zigglgen.git
