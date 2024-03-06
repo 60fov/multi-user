@@ -7,6 +7,10 @@ const Game = @This();
 // const kb = softsrv.input.kb;
 // const mouse = softsrv.input.mouse;
 
+const xy = @import("graphics/xy.zig");
+
+var buffer: [4096]u8 = undefined;
+
 pub const Vec2 = struct {
     x: f32 = 0,
     y: f32 = 0,
@@ -81,19 +85,15 @@ pub fn simulate(state: *Game.State, ms: i64) void {
 }
 
 pub fn render(state: *const Game.State) void {
-    _ = state;
-    // fb.clear();
+    // _ = state;
+    xy.clear();
 
-    // const p = state.player;
-    // softsrv.draw.rect(fb, @intFromFloat(p.pos.x), @intFromFloat(p.pos.y), 50, 50, 100, 100, 255);
+    const p = state.player;
+    xy.rect(@intFromFloat(p.pos.x), @intFromFloat(p.pos.y), 50, 50, 100, 100, 255);
 
-    // const font = try softsrv.getDefaultFont();
-    // const buffer = try softsrv.getDebugBuffer();
-    // for (state.entities, 0..) |e, i| {
-    //     softsrv.draw.rect(fb, @intFromFloat(e.pos.x), @intFromFloat(e.pos.y), 50, 50, 255, 100, 100);
-    //     const str = std.fmt.bufPrint(buffer, "e[{d}] x {d:.1} y {d:.1} vx {d:.1} vy {d:.1}", .{ i, e.pos.x, e.pos.y, e.vel.x, e.vel.y }) catch continue;
-    //     softsrv.draw.text(fb, str, font, 10, 10 + @as(i32, @intCast(i * 10)));
-    // }
-
-    // softsrv.platform.present(fb);
+    for (state.entities, 0..) |e, i| {
+        xy.rect(@intFromFloat(e.pos.x), @intFromFloat(e.pos.y), 50, 50, 255, 100, 100);
+        const str = std.fmt.bufPrint(&Game.buffer, "e[{d}] x {d:.1} y {d:.1} vx {d:.1} vy {d:.1}", .{ i, e.pos.x, e.pos.y, e.vel.x, e.vel.y }) catch continue;
+        xy.text(str, 10, 10 + @as(i32, @intCast(i * 32)), 255, 255, 255);
+    }
 }

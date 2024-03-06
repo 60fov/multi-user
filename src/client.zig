@@ -2,6 +2,9 @@ const std = @import("std");
 const game = @import("game.zig");
 const platform = @import("platform.zig");
 const chrono = @import("chrono.zig");
+const xy = @import("graphics/xy.zig");
+const font = @import("graphics/font.zig");
+const image = @import("image.zig");
 
 const net = @import("net.zig");
 const Server = @import("server.zig");
@@ -25,6 +28,8 @@ print_timer: std.time.Timer,
 
 update_count: u32 = 0,
 render_count: u32 = 0,
+
+sdf_font: font.Sdf = undefined,
 
 state: *game.State,
 
@@ -101,7 +106,23 @@ pub fn update(self: *Client, ms: i64) bool {
 pub fn init(allocator: std.mem.Allocator) !Client {
     try platform.init(allocator, "multi-user", WIDTH, HEIGHT);
     errdefer platform.deinit();
-    std.debug.print("initialized softsrv platform\n", .{});
+    std.debug.print("initialized platform\n", .{});
+
+    try xy.init();
+    errdefer xy.deinit();
+    std.debug.print("initialized 2d renderer\n", .{});
+
+    const font_path = "assets/fonts/hack/sdf_32_5";
+    const bmp = image.Bmp.create(@embedFile(font_path ++ ".bmp"));
+    var sdf_font = font.Sdf{
+        .atlas = try font.Sdf.parseAtlas(allocator, @embedFile(font_path ++ ".json")),
+    };
+    sdf_font.load(@constCast(bmp.raw), bmp.width, bmp.height);
+    errdefer sdf_font.atlas.deinit(allocator);
+    std.debug.print("loaded sdf font: {s}\n", .{font_path});
+
+    xy.setFont(sdf_font);
+    xy.viewport(800, 600, 1);
 
     const state = try allocator.create(game.State);
     errdefer allocator.destroy(state);
@@ -123,14 +144,18 @@ pub fn init(allocator: std.mem.Allocator) !Client {
         .connect_attempt_timer = try std.time.Timer.start(),
         .print_timer = try std.time.Timer.start(),
 
+        .sdf_font = sdf_font,
+
         .state = state,
     };
 }
 
 pub fn deinit(self: *Client) void {
-    // self.framebuffer.deinit();
-    self.socket.close();
     self.allocator.destroy(self.state);
+    self.sdf_font.atlas.deinit(self.allocator);
+    xy.deinit();
+    platform.deinit();
+    self.socket.close();
 }
 
 pub fn run(self: *Client) void {
@@ -151,7 +176,12 @@ pub fn run(self: *Client) void {
         const shouldDraw = frame_limiter.flushAccumulator() > 0;
         if (shouldDraw) {
             self.render_count += 1;
-            // game.render(self.state, &self.framebuffer);
+
+            xy.clear();
+            game.render(self.state);
+            xy.flush();
+
+            platform.present();
         }
     }
 }
