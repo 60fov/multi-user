@@ -1,7 +1,8 @@
 const std = @import("std");
+const Build = std.Build;
 
 // TODO why don't i have to link libc and opengl32.dll
-pub fn build(b: *std.Build) !void {
+pub fn build(b: *Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 

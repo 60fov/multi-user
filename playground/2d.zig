@@ -26,32 +26,51 @@ pub fn main() !void {
     try xy.init();
     defer xy.deinit();
 
+    const font_path = "fonts/hack/sdf_32_5";
+    const bmp = mu.image.Bmp.create(@embedFile(font_path ++ ".bmp"));
+    var sdf_font = graphics.font.Sdf{
+        .atlas = try graphics.font.Sdf.parseAtlas(allocator, @embedFile(font_path ++ ".json")),
+    };
+    sdf_font.load(@constCast(bmp.raw), bmp.width, bmp.height);
+    defer sdf_font.atlas.deinit(allocator);
+    xy.setFont(sdf_font);
+
     xy.viewport(800, 600, 1);
 
-    const rects = try std.heap.page_allocator.alloc(ParticleSim.Rect, 20000);
+    const rects = try std.heap.page_allocator.alloc(ParticleSim.Rect, 10000);
     defer std.heap.page_allocator.free(rects);
 
     sim = ParticleSim.init(rects);
 
-    var ticker = chrono.RateLimiter.init(300);
     var second_timer = chrono.RateLimiter.init(1);
     mouse = platform.input.mouse();
     kb = platform.input.kb();
+    var last = std.time.nanoTimestamp();
 
     while (!platform.shouldQuit()) {
         iter_count += 1;
         platform.poll();
 
-        ticker.call(update);
+        const now = std.time.nanoTimestamp();
+        const ns = now - last;
+        last = now;
+        sim.update(ns);
+
         second_timer.call(print_iteration);
 
+        xy.clear();
+
+        xy.text("behind particles", 100, 200, 125, 225, 85);
         sim.draw();
+        xy.text("infront of particles", 100, 400, 225, 125, 85);
+
+        xy.flush();
 
         platform.present();
     }
 }
 
-pub fn update(ms: i64) void {
+pub fn update(ms: i128) void {
     sim.update(ms);
 }
 
@@ -64,11 +83,11 @@ const ParticleSim = struct {
     const Rect = struct {
         x: f32 = -1,
         y: f32 = -1,
+        xvel: f32 = 0,
+        yvel: f32 = 0,
         r: u8 = 0,
         g: u8 = 0,
         b: u8 = 0,
-        xvel: f32 = 0,
-        yvel: f32 = 0,
     };
     rects: []Rect = undefined,
     rnd: std.rand.Xoshiro256 = undefined,
@@ -82,8 +101,8 @@ const ParticleSim = struct {
         };
     }
 
-    pub fn update(self: *ParticleSim, ms: i64) void {
-        const dt = @as(f32, @floatFromInt(ms)) / 1000000;
+    pub fn update(self: *ParticleSim, ns: i128) void {
+        const dt = @as(f32, @floatFromInt(ns)) / 1e+9;
         for (self.rects) |*rect| {
             if (rect.x < 0 or rect.x > width or rect.y < 0 or rect.y > height) {
                 rect.x = @floatFromInt(mouse.x);
@@ -101,12 +120,8 @@ const ParticleSim = struct {
     }
 
     pub fn draw(self: *ParticleSim) void {
-        xy.clear();
-
         for (self.rects) |r| {
-            xy.rect(@intFromFloat(r.x), @intFromFloat(r.y), 1, 1, r.r, r.g, r.b);
+            xy.rect(@intFromFloat(r.x), @intFromFloat(r.y), 5, 5, r.r, r.g, r.b);
         }
-
-        xy.flush();
     }
 };

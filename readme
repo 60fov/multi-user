@@ -1,0 +1,35 @@
+# MU
+
+**m**ulti-**u**ser project (for school)
+
+## resources
+
+### zig
+https://ziglang.org/ \
+https://ziglang.org/learn/build-system/ \
+https://zig.guide/
+
+### win32
+https://learn.microsoft.com/en-us/windows/win32/ \
+https://gist.github.com/nickrolfe/1127313ed1dbf80254b614a721b3ee9c
+
+### sockets
+https://beej.us/guide/bgnet/
+
+### opengl
+https://learnopengl.com \
+https://docs.gl/ \
+https://github.com/fendevel/Guide-to-Modern-OpenGL-Functions \
+https://www.khronos.org/opengl/wiki/Direct_State_Access
+
+### font rendering
+
+#### sdf stuff
+https://github.com/evanw/font-texture-generator/ \
+https://www.youtube.com/watch?v=1b5hIMqz_wM \
+https://www.youtube.com/watch?v=_t3mtjoHuoQ
+
+#### glyph based stuff
+https://sluglibrary.com/ \
+https://github.com/GreenLightning/gpu-font-rendering \
+https://jcgt.org/published/0006/02/02/

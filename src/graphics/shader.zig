@@ -149,4 +149,18 @@ pub const Program = struct {
         gl.DeleteProgram(self.id);
         self.id = undefined;
     }
+
+    pub fn defaultErrorHandler(self: *Program, err: ShaderProgramError) void {
+        switch (err) {
+            Shader.ShaderProgramError.VertexCompilation => {
+                std.debug.print("failed to compile shader, error {s}", .{self.shader_list.vertex.?.getInfoLog()});
+            },
+            Shader.ShaderProgramError.FragmentCompilation => {
+                std.debug.print("failed to compile shader, error {s}", .{self.shader_list.fragment.?.getInfoLog()});
+            },
+            Shader.ShaderProgramError.Link => {
+                std.debug.print("failed to link shader program, error {s}", .{self.getInfoLog()});
+            },
+        }
+    }
 };
