@@ -19,17 +19,21 @@ https://beej.us/guide/bgnet/
 ### opengl
 https://learnopengl.com \
 https://docs.gl/ \
+https://www.khronos.org/opengl/wiki/ \
+
+#### DSA
 https://github.com/fendevel/Guide-to-Modern-OpenGL-Functions \
 https://www.khronos.org/opengl/wiki/Direct_State_Access
 
+
 ### font rendering
 
-#### sdf stuff
+#### signed distance fields (SDF)
 https://github.com/evanw/font-texture-generator/ \
 https://www.youtube.com/watch?v=1b5hIMqz_wM \
 https://www.youtube.com/watch?v=_t3mtjoHuoQ
 
-#### glyph based stuff
+#### fancy stuff (glyph, curves, etc), glhf!
 https://sluglibrary.com/ \
 https://github.com/GreenLightning/gpu-font-rendering \
 https://jcgt.org/published/0006/02/02/
