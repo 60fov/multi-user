@@ -1,5 +1,10 @@
 const std = @import("std");
 const game = @import("../game.zig");
+const vec = @import("../math/vector.zig");
+
+const Entity = @import("../entity.zig");
+const Vec2 = vec.Vec2;
+const Vec3 = vec.Vec3;
 
 const Packet = @This();
 
@@ -37,29 +42,48 @@ pub const StateUpdate = struct {
 
     pub fn write(self: *const StateUpdate, buffer: *Buffer) void {
         buffer.write(u8, @intFromEnum(Tag.state_update));
-        for (self.state.entities) |entity| {
-            buffer.write(f32, entity.pos.x);
-            buffer.write(f32, entity.pos.y);
-            buffer.write(f32, entity.vel.x);
-            buffer.write(f32, entity.vel.y);
+
+        buffer.write(f32, self.state.time);
+
+        for (0..Entity.SoA.max) |i| {
+            const tag = self.state.entity.tags[i];
+            buffer.write(u8, @as(u8, @intFromEnum(tag)));
         }
-        buffer.write(f32, self.state.player.pos.x);
-        buffer.write(f32, self.state.player.pos.y);
-        buffer.write(f32, self.state.player.vel.x);
-        buffer.write(f32, self.state.player.vel.y);
+
+        for (0..Entity.SoA.max) |i| {
+            const pos = self.state.entity.positions[i];
+            buffer.write(Vec2, pos);
+        }
+
+        for (0..Entity.SoA.max) |i| {
+            const vel = self.state.entity.velocities[i];
+            buffer.write(Vec2, vel);
+        }
+
+        for (0..Entity.SoA.max) |i| {
+            const speed = self.state.entity.speeds[i];
+            buffer.write(f32, speed);
+        }
     }
 
     pub fn read(self: *StateUpdate, buffer: *Buffer) void {
-        for (&self.state.entities) |*entity| {
-            entity.pos.x = buffer.read(f32);
-            entity.pos.y = buffer.read(f32);
-            entity.vel.x = buffer.read(f32);
-            entity.vel.y = buffer.read(f32);
+        self.state.time = buffer.read(f32);
+
+        for (0..Entity.SoA.max) |i| {
+            self.state.entity.tags[i] = @enumFromInt(buffer.read(u8));
         }
-        self.state.player.pos.x = buffer.read(f32);
-        self.state.player.pos.y = buffer.read(f32);
-        self.state.player.vel.x = buffer.read(f32);
-        self.state.player.vel.y = buffer.read(f32);
+
+        for (0..Entity.SoA.max) |i| {
+            self.state.entity.positions[i] = buffer.read(Vec2);
+        }
+
+        for (0..Entity.SoA.max) |i| {
+            self.state.entity.velocities[i] = buffer.read(Vec2);
+        }
+
+        for (0..Entity.SoA.max) |i| {
+            self.state.entity.speeds[i] = buffer.read(f32);
+        }
     }
 };
 
@@ -86,51 +110,66 @@ pub const Buffer = struct {
     data: []u8,
     index: usize,
 
+    inline fn writeInt(self: *Buffer, comptime T: type, value: T) void {
+        const size = @sizeOf(T);
+        std.debug.assert(self.index + size <= self.data.len);
+
+        const dest = self.data[self.index..][0..size];
+        std.mem.writeInt(T, dest, value, .little);
+        self.index += size;
+    }
+
+    inline fn writeFloat(self: *Buffer, comptime T: type, value: T) void {
+        const size = @sizeOf(T);
+        const IntType = std.meta.Int(.unsigned, @bitSizeOf(T));
+        std.debug.assert(self.index + size <= self.data.len);
+
+        const dest = self.data[self.index..][0..size];
+        std.mem.writeInt(IntType, dest, @as(IntType, @bitCast(value)), .little);
+        self.index += size;
+    }
+
     pub fn write(self: *Buffer, comptime T: type, value: T) void {
         switch (T) {
-            u8, u16, u32, i8, i16, i32 => {
-                const size = @sizeOf(T);
-                std.debug.assert(self.index + size <= self.data.len);
-
-                const dest = self.data[self.index..][0..size];
-                std.mem.writeInt(T, dest, value, .little);
-                self.index += size;
-            },
-            f16, f32 => {
-                const size = @sizeOf(T);
-                const IntType = std.meta.Int(.unsigned, @bitSizeOf(T));
-                std.debug.assert(self.index + size <= self.data.len);
-
-                const dest = self.data[self.index..][0..size];
-                std.mem.writeInt(IntType, dest, @as(IntType, @bitCast(value)), .little);
-                self.index += size;
-            },
+            u8, u16, u32, i8, i16, i32 => writeInt(self, T, value),
+            f16, f32 => writeFloat(self, T, value),
+            Vec2, Vec3 => inline for (value.v) |v| writeFloat(self, T.Scalar, v),
             else => @compileError("packet buffer write, unhandled type " ++ @typeName(T)),
         }
     }
 
+    inline fn readInt(self: *Buffer, comptime T: type) T {
+        const size = @sizeOf(T);
+        std.debug.assert(self.index + size <= self.data.len);
+
+        const src = self.data[self.index..][0..size];
+        self.index += size;
+        return std.mem.readInt(T, src, .little);
+    }
+
+    inline fn readFloat(self: *Buffer, comptime T: type) T {
+        const size = @sizeOf(T);
+        const IntType = std.meta.Int(.unsigned, @bitSizeOf(T));
+        std.debug.assert(self.index + size < self.data.len);
+
+        const src = self.data[self.index..][0..size];
+        self.index += size;
+        return @bitCast(std.mem.readInt(IntType, src, .little));
+    }
+
     pub fn read(self: *Buffer, comptime T: type) T {
-        switch (T) {
-            u8, u16, u32, i8, i16, i32 => {
-                const size = @sizeOf(T);
-                std.debug.assert(self.index + size <= self.data.len);
-
-                const src = self.data[self.index..][0..size];
-                self.index += size;
-                return std.mem.readInt(T, src, .little);
-            },
-            f16, f32 => {
-                const size = @sizeOf(T);
-                const IntType = std.meta.Int(.unsigned, @bitSizeOf(T));
-                std.debug.assert(self.index + size < self.data.len);
-
-                const src = self.data[self.index..][0..size];
-                self.index += size;
-                // TODO consider making readFloat function
-                return @bitCast(std.mem.readInt(IntType, src, .little));
+        return switch (T) {
+            u8, u16, u32, i8, i16, i32 => readInt(self, T),
+            f16, f32 => readFloat(self, T),
+            Vec2, Vec3 => {
+                var v: Vec2 = undefined;
+                inline for (0..T.dim) |i| {
+                    v.v[i] = readFloat(self, T.Scalar);
+                }
+                return v;
             },
             else => @compileError("packet buffer read, unhandled type " ++ @typeName(T)),
-        }
+        };
     }
 };
 

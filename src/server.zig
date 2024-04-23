@@ -6,7 +6,7 @@ const net = @import("net.zig");
 
 const game = @import("game.zig");
 
-pub const tick_rate = 120;
+pub const tick_rate = 20;
 pub const conn_max = 256;
 
 // TODO why do these have to be var
@@ -15,6 +15,7 @@ pub var ip: std.net.Address = std.net.Address.initIp4([4]u8{ 172, 16, 4, 7 }, 0x
 
 const Server = @This();
 
+running: bool = true,
 render_view: bool = false,
 
 allocator: std.mem.Allocator,
@@ -24,7 +25,7 @@ connections: []Connection,
 
 state: *game.State,
 
-pub fn update(self: *Server, ms: i64) bool {
+pub fn update(self: *Server, dt: u32) bool {
     // ingest incomming packets
     var sender_ip: std.net.Address = undefined;
     while (self.socket.recvPacket(&sender_ip)) |packet| {
@@ -71,7 +72,7 @@ pub fn update(self: *Server, ms: i64) bool {
     }
 
     // update game state
-    game.simulate(self.state, ms);
+    game.simulate(self.state, dt);
 
     // send new game state
     {
@@ -135,25 +136,48 @@ pub fn isAddressConnected(self: *Server, address: std.net.Address) bool {
 }
 
 pub fn run(self: *Server) void {
-    var tick_limiter = chrono.RateLimiter.init(tick_rate);
-    // var frame_limiter = softsrv.chrono.RateLimiter.init(Server.RATE);
+    // 16, 20, 25, 32, 40, 50, 64, 80, 100, 125, 128, 160, 200, 250, 256
+    // possible tickrates (factors of 1e+n resulting in rational values)
+    // this is important since nanoTimestamp returns an integer
+    const dt: u32 = @divExact(1e+9, 128);
 
-    var running = true;
-    while (running) {
-        {
-            const steps = tick_limiter.flushAccumulator();
-            for (0..steps) |_| {
-                running = self.update(tick_limiter.ms);
-            }
+    var last = std.time.nanoTimestamp();
+    var frame_time_accumulator: u32 = 0;
+
+    while (self.running) {
+        // if (platform.shouldQuit()) break;
+
+        const now = std.time.nanoTimestamp();
+        // what happens if delta (now-last) > max(u32)?
+        var frame_time: u32 = @intCast(now - last);
+
+        // crash if falling behind (can't do, need separate window thread)
+        // std.debug.assert(frame_time <= dt);
+
+        if (frame_time > dt) {
+            const over_time = frame_time - dt;
+            std.debug.print("fell behind. lost {d}ms\n", .{over_time / (1000 * 1000)});
+            frame_time = dt;
         }
 
-        // change to comptime debug render
-        if (self.render_view) {
-            const steps = tick_limiter.flushAccumulator();
-            for (0..steps) |_| {
-                // Game.render(self.state, self.);
-            }
+        last = now;
+
+        frame_time_accumulator += frame_time;
+
+        while (frame_time_accumulator > dt) {
+            // self.update_count += 1;
+            _ = self.update(dt);
+            frame_time_accumulator -= dt;
         }
+
+        // if (self.render_view) {
+        //     const interp_factor: f32 = @as(f32, @floatFromInt(frame_time_accumulator)) / @as(f32, @floatFromInt(dt));
+        //     const state_interp: game.State = game.interpolate(self.state_prev, self.state_next, interp_factor);
+
+        //     self.render_count += 1;
+        //     game.render(&state_interp);
+        //     platform.present();
+        // }
     }
 }
 

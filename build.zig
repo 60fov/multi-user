@@ -6,12 +6,13 @@ pub fn build(b: *Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // modules
-    // const softsrv_module = b.addModule("softsrv", .{
-    //     .root_source_file = .{ .path = "lib/softsrv/src/softsrv.zig" },
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
+    const install_step = b.getInstallStep();
+    const install_assets = b.addInstallDirectory(.{
+        .source_dir = .{ .path = "assets" },
+        .install_dir = .{ .custom = "bin" },
+        .install_subdir = "assets",
+    });
+    install_step.dependOn(&install_assets.step);
 
     const gl_module = @import("zigglgen").generateBindingsModule(b, .{
         .api = .gl,
@@ -34,13 +35,12 @@ pub fn build(b: *Build) !void {
         .optimize = optimize,
     });
 
-    // exe.root_module.addImport("softsrv", softsrv_module);
     exe.root_module.addImport("gl", gl_module);
     exe.linkLibC(); // TODO remove
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
+    run_cmd.step.dependOn(install_step);
 
     if (b.args) |args| {
         run_cmd.addArgs(args);

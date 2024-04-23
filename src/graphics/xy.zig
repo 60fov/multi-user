@@ -1,7 +1,11 @@
 const std = @import("std");
 const gl = @import("gl");
+const asset = @import("../asset.zig");
 
-const Shader = @import("shader.zig");
+const shader = @import("shader.zig");
+const Shader = shader.Shader;
+const Program = shader.Program;
+
 const font = @import("font.zig");
 
 var aspect: f32 = undefined;
@@ -30,13 +34,13 @@ fn DrawCallQueue(DataType: anytype, max_count: comptime_int) type {
 
         vao: gl.uint,
         buffer_id: gl.uint,
-        shader_prog: Shader.Program,
+        shader_prog: Program,
         index: usize = 0,
 
         pub fn init(
             // allocator: std.mem.Allocator,
             vao: gl.uint,
-            shader_prog: Shader.Program,
+            shader_prog: Program,
             shader_buffer_index: u32,
         ) Self {
             var id: gl.uint = undefined;
@@ -117,12 +121,6 @@ const ShaderStorageInfo = struct {
 
 var info: ShaderStorageInfo = undefined;
 
-const rect_vs_src = @embedFile("shaders/xy_rect.vert");
-const rect_fs_src = @embedFile("shaders/xy_rect.frag");
-
-const sdf_text_vs_src = @embedFile("shaders/xy_sdf_text.vert");
-const sdf_text_fs_src = @embedFile("shaders/xy_sdf_text.frag");
-
 var vaos: struct {
     rect: gl.uint,
 } = undefined;
@@ -148,15 +146,18 @@ var dcq_table: struct {
 
 var debug_buffer: [4096]u8 = undefined;
 var program: struct {
-    rect: Shader.Program,
-    sdf_text: Shader.Program,
+    rect: Program,
+    sdf_text: Program,
 } = undefined;
 
 var current_font: font.Sdf = undefined;
+var default_font: font.Sdf = undefined;
 
 pub fn init() !void {
     gl.Enable(gl.DEBUG_OUTPUT);
     gl.Enable(gl.DEPTH_TEST);
+    gl.Enable(gl.BLEND);
+    gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     gl.DebugMessageCallback(debug_callback, null);
 
@@ -176,22 +177,27 @@ pub fn init() !void {
     gl.EnableVertexArrayAttrib(vaos.rect, 0);
     gl.VertexArrayAttribFormat(vaos.rect, 0, 2, gl.FLOAT, gl.FALSE, 0);
 
-    program.rect = Shader.Program.init(.{
-        .vertex = Shader.init(.vertex, rect_vs_src),
-        .fragment = Shader.init(.fragment, rect_fs_src),
+    program.rect = Program.init(.{
+        .vertex = Shader.init(.vertex, "shaders/xy_rect.vert"),
+        .fragment = Shader.init(.fragment, "shaders/xy_rect.frag"),
     });
 
-    program.rect.link() catch |err| program.rect.defaultErrorHandler(err);
+    program.rect.compileAndLink() catch |err| program.rect.defaultErrorHandler(err);
 
-    program.sdf_text = Shader.Program.init(.{
-        .vertex = Shader.init(.vertex, sdf_text_vs_src),
-        .fragment = Shader.init(.fragment, sdf_text_fs_src),
+    program.sdf_text = Program.init(.{
+        .vertex = Shader.init(.vertex, "shaders/xy_sdf_text.vert"),
+        .fragment = Shader.init(.fragment, "shaders/xy_sdf_text.frag"),
     });
 
-    program.sdf_text.link() catch |err| program.sdf_text.defaultErrorHandler(err);
+    program.sdf_text.compileAndLink() catch |err| program.sdf_text.defaultErrorHandler(err);
+
+    shader.manager.add("rect", program.rect);
+    shader.manager.add("sdf_text", program.sdf_text);
 
     dcq_table.rects = DrawCallQueueRect.init(vaos.rect, program.rect, 1);
     dcq_table.sdf_text = DrawCallQueueSdfText.init(vaos.rect, program.sdf_text, 2);
+
+    default_font = font.manager.get("hack");
 }
 
 pub fn clear() void {
@@ -205,7 +211,7 @@ pub fn setFont(sdf_font: font.Sdf) void {
     info.font_height = @floatFromInt(sdf_font.atlas.glyph_max_height);
     gl.NamedBufferSubData(buffers.sbo_info, 0, @sizeOf(ShaderStorageInfo), @ptrCast(&info));
     const t_unit = 0;
-    gl.BindTextureUnit(t_unit, sdf_font.texture);
+    gl.BindTextureUnit(t_unit, sdf_font.texture.id);
 }
 
 pub fn deinit() void {
@@ -268,6 +274,18 @@ pub fn flush() void {
     }
 
     draw_depth = 0.0;
+}
+
+pub fn screen_width() f32 {
+    return info.screen_width;
+}
+
+pub fn screen_height() f32 {
+    return info.screen_height;
+}
+
+pub fn getDefaultFont() font.Sdf {
+    return default_font;
 }
 
 pub fn debug_callback(

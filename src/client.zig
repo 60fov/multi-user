@@ -1,12 +1,17 @@
 const std = @import("std");
+
 const game = @import("game.zig");
 const platform = @import("platform.zig");
 const chrono = @import("chrono.zig");
 const xy = @import("graphics/xy.zig");
 const font = @import("graphics/font.zig");
 const image = @import("image.zig");
-
+const asset = @import("asset.zig");
 const net = @import("net.zig");
+const shader = @import("graphics/shader.zig");
+const global = @import("global.zig");
+const ui = @import("graphics/ui.zig");
+
 const Server = @import("server.zig");
 
 pub const frame_rate = 300;
@@ -21,6 +26,8 @@ const HEIGHT = 600;
 
 allocator: std.mem.Allocator,
 
+running: bool = true,
+
 socket: net.Socket,
 connected_to_server: bool = false,
 connect_attempt_timer: std.time.Timer,
@@ -29,18 +36,16 @@ print_timer: std.time.Timer,
 update_count: u32 = 0,
 render_count: u32 = 0,
 
-sdf_font: font.Sdf = undefined,
+state_prev: *game.State,
+state_next: *game.State,
 
-state: *game.State,
-
-pub fn update(self: *Client, ms: i64) bool {
-    _ = ms;
+pub fn update(self: *Client, dt: u32) bool {
     if (!self.connected_to_server) {
         const last_time = self.connect_attempt_timer.read();
         if (last_time >= reconnect_time * 1e+9) {
             self.connect_attempt_timer.reset();
             const packet = net.Packet{ .data = .{ .connect_request = .{} } };
-            std.debug.print("attempting to connect to server @ {}...\n", .{Server.ip});
+            // std.debug.print("attempting to connect to server @ {}...\n", .{Server.ip});
             self.socket.sendPacket(&packet, Server.ip) catch |err| {
                 std.debug.print("failed to send connect packet, error {s}\n", .{@errorName(err)});
             };
@@ -61,7 +66,7 @@ pub fn update(self: *Client, ms: i64) bool {
                 self.connected_to_server = true;
             },
             .state_update => {
-                self.state.* = packet.data.state_update.state;
+                self.state_next.* = packet.data.state_update.state;
             },
             else => {
                 std.debug.print("unhandled packet type: {s}\n", .{@tagName(packet.data)});
@@ -80,7 +85,7 @@ pub fn update(self: *Client, ms: i64) bool {
         const elapsed = self.print_timer.read();
         if (elapsed > 1 * 1e+9) {
             self.print_timer.reset();
-            std.debug.print("fps: {d}, tps: {d}\n", .{ self.render_count, self.update_count });
+            // std.debug.print("fps: {d}, tps: {d}\n", .{ self.render_count, self.update_count });
             self.render_count = 0;
             self.update_count = 0;
         }
@@ -95,10 +100,8 @@ pub fn update(self: *Client, ms: i64) bool {
     // interp rendition
 
     // update game state
-    // game.simulate(self.state, ms);
-
-    // render
-    // game.render(self.state, &self.framebuffer);
+    self.state_prev.* = self.state_next.*;
+    game.simulate(self.state_next, dt);
 
     return true;
 }
@@ -108,27 +111,34 @@ pub fn init(allocator: std.mem.Allocator) !Client {
     errdefer platform.deinit();
     std.debug.print("initialized platform\n", .{});
 
+    shader.init(allocator);
+    errdefer shader.deinit();
+
+    font.init(allocator);
+    errdefer font.deinit();
+
+    const font_path = "fonts/hack/sdf_32_5";
+    var sdf_font = try font.Sdf.init(font_path);
+    errdefer sdf_font.atlas.deinit(allocator);
+    font.manager.add("hack", sdf_font);
+    std.debug.print("loaded sdf font: {s}\n", .{font_path});
+
     try xy.init();
     errdefer xy.deinit();
     std.debug.print("initialized 2d renderer\n", .{});
 
-    const font_path = "assets/fonts/hack/sdf_32_5";
-    const bmp = image.Bmp.create(@embedFile(font_path ++ ".bmp"));
-    var sdf_font = font.Sdf{
-        .atlas = try font.Sdf.parseAtlas(allocator, @embedFile(font_path ++ ".json")),
-    };
-    sdf_font.load(@constCast(bmp.raw), bmp.width, bmp.height);
-    errdefer sdf_font.atlas.deinit(allocator);
-    std.debug.print("loaded sdf font: {s}\n", .{font_path});
-
     xy.setFont(sdf_font);
     xy.viewport(800, 600, 1);
 
-    const state = try allocator.create(game.State);
-    errdefer allocator.destroy(state);
+    const state_prev_ptr = try allocator.create(game.State);
+    errdefer allocator.destroy(state_prev_ptr);
+    const state_next_ptr = try allocator.create(game.State);
+    errdefer allocator.destroy(state_next_ptr);
 
-    state.* = game.initialState();
-    std.debug.print("initialized game state: {any}\n", .{state.*});
+    state_prev_ptr.* = game.initialState();
+    state_next_ptr.* = state_prev_ptr.*;
+
+    std.debug.print("initialized game state\n", .{});
 
     var socket = net.Socket{};
     errdefer socket.close();
@@ -137,6 +147,8 @@ pub fn init(allocator: std.mem.Allocator) !Client {
     try socket.bindAlloc(allocator);
     std.debug.print("client address: {any}\n", .{socket.address.?});
 
+    ui.state = .{ .style = .{ .font = xy.getDefaultFont() } };
+
     return Client{
         .allocator = allocator,
         .socket = socket,
@@ -144,45 +156,63 @@ pub fn init(allocator: std.mem.Allocator) !Client {
         .connect_attempt_timer = try std.time.Timer.start(),
         .print_timer = try std.time.Timer.start(),
 
-        .sdf_font = sdf_font,
-
-        .state = state,
+        .state_prev = state_prev_ptr,
+        .state_next = state_next_ptr,
     };
 }
 
 pub fn deinit(self: *Client) void {
-    self.allocator.destroy(self.state);
-    self.sdf_font.atlas.deinit(self.allocator);
+    shader.deinit();
+    self.allocator.destroy(self.state_next);
+    self.allocator.destroy(self.state_prev);
     xy.deinit();
     platform.deinit();
     self.socket.close();
 }
 
 pub fn run(self: *Client) void {
-    var tick_limiter = chrono.RateLimiter.init(Client.tick_rate);
-    var frame_limiter = chrono.RateLimiter.init(Client.frame_rate);
+    // 16, 20, 25, 32, 40, 50, 64, 80, 100, 125, 128, 160, 200, 250, 256
+    // possible tickrates (factors of 1e+n resulting in rational values)
+    // this is important since nanoTimestamp returns an integer
+    const dt: u32 = @divExact(1e+9, 128);
 
-    var running = true;
-    while (running and !platform.shouldQuit()) {
-        // tick
-        const update_steps = tick_limiter.flushAccumulator();
-        for (0..update_steps) |_| {
+    var last = std.time.nanoTimestamp();
+    var frame_time_accumulator: u32 = 0;
+
+    while (self.running) {
+        if (platform.shouldQuit()) break;
+
+        const now = std.time.nanoTimestamp();
+        // what happens if delta (now-last) > max(u32)?
+        var frame_time: u32 = @intCast(now - last);
+
+        // crash if falling behind (can't do, need separate window thread)
+        // std.debug.assert(frame_time <= dt);
+
+        if (frame_time > dt) {
+            const over_time = frame_time - dt;
+            std.debug.print("fell behind. lost {d}ms\n", .{over_time / (1000 * 1000)});
+            frame_time = dt;
+        }
+
+        last = now;
+
+        frame_time_accumulator += frame_time;
+
+        while (frame_time_accumulator > dt) {
             self.update_count += 1;
-            running = self.update(tick_limiter.ms);
+            shader.manager.watch();
+            _ = self.update(dt);
+            frame_time_accumulator -= dt;
         }
 
-        // draw
-        // TODO change this, doing unecessary stuff in limiter logic
-        const shouldDraw = frame_limiter.flushAccumulator() > 0;
-        if (shouldDraw) {
-            self.render_count += 1;
+        const interp_factor: f32 = @as(f32, @floatFromInt(frame_time_accumulator)) / @as(f32, @floatFromInt(dt));
+        var state_interp: game.State = .{};
+        game.interpolate(&state_interp, self.state_prev, self.state_next, interp_factor);
 
-            xy.clear();
-            game.render(self.state);
-            xy.flush();
-
-            platform.present();
-        }
+        self.render_count += 1;
+        game.render(&state_interp);
+        platform.present();
     }
 }
 

@@ -14,11 +14,11 @@ float layer(uint capacity, uint layer) {
 
 void main() {
     vec3 coord = vec3(f_uv, layer(256, character));
-    vec4 samp = texture(font_tex, coord);
+    float samp = texture(font_tex, coord).r;
 
-    samp.a = samp.r < 0.5 ? 1 : 0;
-    // samp.a = smoothstep(0.5, -0.5, dist);
-
-    // if (samp.r < 0.5) discard;
-    out_frag = samp * f_col;
+    float scale = 1.0 / fwidth(samp);
+    float signedDistance = (samp - 0.5) * scale;
+    float alpha = clamp(signedDistance + 0.5, 0.0, 1.0);
+    if (samp < 0.4) discard;
+    out_frag = vec4(f_col.xyz, alpha);
 }

@@ -11,6 +11,8 @@ const std = @import("std");
 
 const Server = @import("server.zig");
 const Client = @import("client.zig");
+const global = @import("global.zig");
+const asset = @import("asset.zig");
 
 const Packet = struct {};
 
@@ -47,6 +49,9 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, app_mode_arg_lower, "client")) {
         app_mode = AppMode.client;
     }
+
+    try global.init(allocator);
+    defer global.deinit(allocator);
 
     // TODO implement an interface for server and client
     switch (app_mode) {

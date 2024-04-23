@@ -1,0 +1,48 @@
+[ ] logging / app debug awareness
+
+general 
+    build
+        [ ] prod vs dev
+            the install directory should copy assets into exe folder 
+            and the path for loading files changes from cwd to exe
+    [ ] event system
+
+xy: 2d renderer
+    fix
+        [x] screen data into shader
+    feat
+        [x] rect
+        [x] font rendering
+        [ ] circle
+        [ ] line
+        [ ] curve
+        [ ] center/corner based rendering
+    opti
+        [ ] persitently mapped buffers
+
+graphics
+    shader
+        [ ] shader reloading/watching
+        [ ] uniforms
+        [*] ubo / ssbo (global / not shader specific)
+    image loading
+        [ ] png (https://pyokagan.name/blog/2019-10-14-png/)
+
+multi-user
+        [x] assignment 1
+            In this project you will use the Mosaic engine to make a simple program that sends messages back and forth between a server and client. 
+
+            Your server will send packets to the clients containing important data, and the clients simply need to send a ping to the server to signal that they exist. The server should send the position of 3 objects to the clients. The clients will then need to receive that data and draw the objects at the position. Your game should have two clients connected to the server, and the server should be able to handle clients dropping in and out. 
+
+        [x] assignment 2
+            In this project you'll implement basic client-side prediction for movement. 
+
+            You should have a server with at least one client that connects. A client controls one character and sends messages to the server about its input so the server can update its position. It should also be able to predict its own motion. The server will also update a number of NPCs which should be continuously moving. It will tell the client about their position and velocity, but the client will also need to predict their movement so it appears smooth (does the client need to send any data about them to the server tho?)
+
+            You'll want to be able to simulate a correction from the server to the client. 
+
+        [ ] assignment 3
+            Write a program that has the same behavior as the previous exercise, but can run multiple instances of a "game" on the server. A client should have a button to join a game, in which case you can just place them in a random instance. They should also have a button to create a new game which will tell the server to spin up a new instance which it will then simulate. 
+
+            Think about how you structure the server and organize it's data to support multiple instances. Instead of the server simply having one set of memory that it uses for the game you'll want it to have an array of instances of this data, that way it's clear which entities belong to which instance.
+
